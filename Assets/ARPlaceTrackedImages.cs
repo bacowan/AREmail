@@ -12,34 +12,41 @@ public class ARPlaceTrackedImages : MonoBehaviour
 {
     public GameObject EmailPlane;
     public GameObject InstructionsUI;
-    public GameObject SoundsOkayUI;
     public GameObject OptionsUI;
+    public GameObject ScoreUI;
     public GameObject CorrectLabel;
     public GameObject IncorrectLabel;
     public TextAsset EmailData;
     public Camera Camera;
 
-    private readonly Dictionary<string, Tuple<GameObject, EmailInfoCollection.EmailInfo>> instantiatedEmails
-        = new Dictionary<string, Tuple<GameObject, EmailInfoCollection.EmailInfo>>();
-    private EmailInfoCollection loadedEmails;
-    private EmailInfoCollection.EmailInfo activeEmail;
+    private readonly Dictionary<string, Tuple<GameObject, QuestionCollection.QuestionInfo>> instantiatedEmails
+        = new Dictionary<string, Tuple<GameObject, QuestionCollection.QuestionInfo>>();
+    private QuestionCollection loadedEmails;
+    private QuestionCollection.QuestionInfo activeEmail;
     private ARTrackedImageManager trackedImagesManager;
+
+    private IDictionary<string, QuestionState> questionStates = new Dictionary<string, QuestionState>();
 
     void Awake()
     {
         trackedImagesManager = GetComponent<ARTrackedImageManager>();
 
         // load the email config
-        loadedEmails = JsonUtility.FromJson<EmailInfoCollection>(EmailData.text);
-
-        var yesButton = SoundsOkayUI.transform.GetChild(1)?.GetComponent<Button>();
-        yesButton.onClick.AddListener(SoundsOkayYesClicked);
-
-        var noButton = SoundsOkayUI.transform.GetChild(2)?.GetComponent<Button>();
-        noButton.onClick.AddListener(SoundsOkayNoClicked);
+        loadedEmails = JsonUtility.FromJson<QuestionCollection>(EmailData.text);
+        foreach (var question in loadedEmails.items)
+        {
+            questionStates[question.name] = new QuestionState
+            {
+                questionName = question.name,
+                order = Enumerable.Range(0, question.scenarios.Length).OrderBy(i => UnityEngine.Random.value).ToArray()
+            };
+        }
 
         var submitButton = OptionsUI.transform.GetChild(1)?.GetComponent<Button>();
         submitButton.onClick.AddListener(OptionsSubmitClicked);
+
+        var tryAgain = IncorrectLabel.transform.GetChild(1)?.GetComponent<Button>();
+        tryAgain.onClick.AddListener(TryAgainClicked);
     }
 
     void OnEnable()
@@ -66,7 +73,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
                 {
                     // email found; create it and update the UI
                     var newPrefab = CreateVREmail(trackedImage, email);
-                    instantiatedEmails[imageName] = new Tuple<GameObject, EmailInfoCollection.EmailInfo>(newPrefab, email);
+                    instantiatedEmails[imageName] = new Tuple<GameObject, QuestionCollection.QuestionInfo>(newPrefab, email);
                 }
             }
         }
@@ -91,7 +98,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
 
     // We have one "active email" at a time. This is the one that appears on-screen for the UI.
     // Note that this could result in a race condition if multiple emails appear onscreen at the same time.
-    private void SetActiveEmail(EmailInfoCollection.EmailInfo email)
+    private void SetActiveEmail(QuestionCollection.QuestionInfo email)
     {
         if (email == null)
         {
@@ -99,29 +106,33 @@ public class ARPlaceTrackedImages : MonoBehaviour
         }
         else if (activeEmail == null || email.name != activeEmail.name)
         {
-            Debug.Log(email.name);
             StartQuestionUI(email);
         }
 
         activeEmail = email;
     }
 
-    private void StartQuestionUI(EmailInfoCollection.EmailInfo email)
+    private void StartQuestionUI(QuestionCollection.QuestionInfo email)
     {
-        var text = SoundsOkayUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
-        if (text != null)
+        SetAllUIsInactive();
+        OptionsUI.SetActive(true);
+        var questionText = OptionsUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
+        if (questionText != null)
         {
-            text.text = email.question;
+            questionText.text = email.question;
         }
 
-        SetAllUIsInactive();
-        SoundsOkayUI.SetActive(true);
+        var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
+        if (dropdown != null && questionStates.TryGetValue(email.name, out var questionState))
+        {
+            dropdown.ClearOptions();
+            dropdown.AddOptions(email.scenarios[questionState.order[questionState.currentTry]].options.ToList());
+        }
     }
 
     private void SetAllUIsInactive()
     {
         InstructionsUI.SetActive(false);
-        SoundsOkayUI.SetActive(false);
         OptionsUI.SetActive(false);
         CorrectLabel.SetActive(false);
         IncorrectLabel.SetActive(false);
@@ -133,56 +144,47 @@ public class ARPlaceTrackedImages : MonoBehaviour
         InstructionsUI.SetActive(true);
     }
 
-    public void SoundsOkayYesClicked()
+    public void TryAgainClicked()
     {
-        if (activeEmail != null)
+        if (instantiatedEmails.TryGetValue(activeEmail.name, out var email)
+            && questionStates.TryGetValue(activeEmail.name, out var questionState))
         {
-            SetAllUIsInactive();
-            if (activeEmail.correctOption == null)
-            {
-                CorrectLabel.SetActive(true);
-            }
-            else
-            {
-                IncorrectLabel.SetActive(true);
-            }
-        }
-    }
-
-    public void SoundsOkayNoClicked()
-    {
-        if (activeEmail != null)
-        {
-            SetAllUIsInactive();
-            OptionsUI.SetActive(true);
-            var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
-            if (dropdown != null)
-            {
-                dropdown.ClearOptions();
-                dropdown.AddOptions(activeEmail.options.ToList());
-            }
+            StartQuestionUI(activeEmail);
+            var canvas = email.Item1.transform.GetChild(0).GetComponent<Canvas>();
+            var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
+            body.text = activeEmail.scenarios[questionState.order[questionState.currentTry]].background;
         }
     }
 
     public void OptionsSubmitClicked()
     {
-        if (activeEmail != null)
+        if (activeEmail != null && questionStates.TryGetValue(activeEmail.name, out var questionState))
         {
+            var currentScenario = activeEmail.scenarios[questionState.order[questionState.currentTry]];
             var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
-            if (dropdown != null && dropdown.options[dropdown.value].text == activeEmail.correctOption)
+            if (dropdown != null && dropdown.options[dropdown.value].text == currentScenario.correct)
             {
                 SetAllUIsInactive();
-                CorrectLabel.SetActive(true); 
+                CorrectLabel.SetActive(true);
+                questionState.successful = true;
+                var scoreText = ScoreUI.transform.GetChild(1)?.GetComponent<TMPro.TextMeshProUGUI>();
+                if (scoreText != null)
+                {
+                    scoreText.text = questionStates.Count(s => s.Value.successful).ToString()
+                        + "/"
+                        + questionStates.Count.ToString();
+                }
             }
             else
             {
                 SetAllUIsInactive();
                 IncorrectLabel.SetActive(true);
+                questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
             }
         }
     }
 
-    private GameObject CreateVREmail(ARTrackedImage trackedImage, EmailInfoCollection.EmailInfo email)
+    private GameObject CreateVREmail(ARTrackedImage trackedImage, QuestionCollection.QuestionInfo email)
     {
         var newPrefab = Instantiate(EmailPlane, trackedImage.transform) as GameObject;
         var canvas = newPrefab.transform.GetChild(0).GetComponent<Canvas>();
@@ -190,16 +192,11 @@ public class ARPlaceTrackedImages : MonoBehaviour
         {
             canvas.worldCamera = Camera;
 
-            var title = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
-            var body = canvas.transform.GetChild(1)?.GetComponent<TMPro.TextMeshProUGUI>();
+            var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
 
-            if (title != null)
+            if (body != null && questionStates.TryGetValue(email.name, out var questionState))
             {
-                title.text = email.subject;
-            }
-            if (body != null)
-            {
-                body.text = email.body;
+                body.text = email.scenarios[questionState.order[questionState.currentTry]].background;
             }
         }
 
@@ -207,19 +204,32 @@ public class ARPlaceTrackedImages : MonoBehaviour
     }
 
     [Serializable]
-    private class EmailInfoCollection
+    private class QuestionCollection
     {
-        public EmailInfo[] items;
+        public QuestionInfo[] items;
 
         [Serializable]
-        public class EmailInfo
+        public class QuestionInfo
         {
             public string name;
-            public string subject;
-            public string body;
             public string question;
-            public string[] options;
-            public string correctOption;
+            public Scenario[] scenarios;
         }
+
+        [Serializable]
+        public class Scenario
+        {
+            public string background;
+            public string[] options;
+            public string correct;
+        }
+    }
+
+    private class QuestionState
+    {
+        public string questionName;
+        public int[] order;
+        public int currentTry = 0;
+        public bool successful = false;
     }
 }
