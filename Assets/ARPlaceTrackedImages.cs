@@ -114,19 +114,75 @@ public class ARPlaceTrackedImages : MonoBehaviour
 
     private void StartQuestionUI(QuestionCollection.QuestionInfo email)
     {
-        SetAllUIsInactive();
-        OptionsUI.SetActive(true);
-        var questionText = OptionsUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
-        if (questionText != null)
+        if (questionStates.TryGetValue(email.name, out var questionState))
         {
-            questionText.text = email.question;
-        }
+            SetAllUIsInactive();
+            if (questionState.successful)
+            {
+                CorrectLabel.SetActive(true);
+            }
+            else
+            {
+                var scenario = email.scenarios[questionState.order[questionState.currentTry]];
+                OptionsUI.SetActive(true);
+                var questionText = OptionsUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
+                if (questionText != null)
+                {
+                    questionText.text = scenario.question;
+                }
 
-        var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
-        if (dropdown != null && questionStates.TryGetValue(email.name, out var questionState))
-        {
-            dropdown.ClearOptions();
-            dropdown.AddOptions(email.scenarios[questionState.order[questionState.currentTry]].options.ToList());
+                var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
+                if (dropdown != null)
+                {
+                    dropdown.ClearOptions();
+                    dropdown.AddOptions(scenario.options.ToList());
+
+                    var itemTemplate = dropdown.transform.Find("Template/Viewport/Content/Item");
+                    var contentTemplate = dropdown.transform.Find("Template/Viewport/Content");
+                    if (scenario.options.Any(o => o.Length > 35))
+                    {
+                        dropdown.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            130);
+                        itemTemplate.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            70);
+                        contentTemplate.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            70);
+                    }
+                    else
+                    {
+                        dropdown.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            75);
+                        itemTemplate.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            30);
+                        contentTemplate.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                            RectTransform.Axis.Vertical,
+                            30);
+                    }
+
+                    // Make the heights of the options fit
+                    /*foreach (var child in dropdown.transform)
+                    {
+                        print(child);
+                        if (child is GameObject childObj)
+                        {
+                            print("in1");
+                            if (childObj.name == "Item")
+                            {
+                                print("in2");
+                                var text = childObj.transform.GetChild(0)?.GetComponent<RectTransform>();
+                                childObj.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
+                                    RectTransform.Axis.Vertical,
+                                    text.sizeDelta.y + 10);
+                            }
+                        }
+                    }*/
+                }
+            }
         }
     }
 
@@ -212,7 +268,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
         public class QuestionInfo
         {
             public string name;
-            public string question;
             public Scenario[] scenarios;
         }
 
@@ -220,6 +275,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
         public class Scenario
         {
             public string background;
+            public string question;
             public string[] options;
             public string correct;
         }
