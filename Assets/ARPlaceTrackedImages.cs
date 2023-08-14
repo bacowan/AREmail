@@ -38,7 +38,8 @@ public class ARPlaceTrackedImages : MonoBehaviour
             questionStates[question.name] = new QuestionState
             {
                 questionName = question.name,
-                order = Enumerable.Range(0, question.scenarios.Length).OrderBy(i => UnityEngine.Random.value).ToArray()
+                successes = Enumerable.Repeat(false, question.scenarios.Length).ToArray(),
+                currentTry = 0
             };
         }
 
@@ -47,6 +48,9 @@ public class ARPlaceTrackedImages : MonoBehaviour
 
         var tryAgain = IncorrectLabel.transform.GetChild(1)?.GetComponent<Button>();
         tryAgain.onClick.AddListener(TryAgainClicked);
+
+        var nextQuestion = CorrectLabel.transform.GetChild(1)?.GetComponent<Button>();
+        nextQuestion.onClick.AddListener(TryAgainClicked);
     }
 
     void OnEnable()
@@ -83,6 +87,11 @@ public class ARPlaceTrackedImages : MonoBehaviour
         {
             var trackedItem = instantiatedEmails[trackedImage.referenceImage.name];
             trackedItem.Item1.SetActive(trackedImage.trackingState == TrackingState.Tracking);
+
+            if (questionStates.TryGetValue(trackedImage.referenceImage.name, out var questionState))
+            {
+                UpdateBackgroundText(trackedItem.Item1, questionState);
+            }
         }
 
         // go through items which the tracker has deemed removed
@@ -117,13 +126,13 @@ public class ARPlaceTrackedImages : MonoBehaviour
         if (questionStates.TryGetValue(email.name, out var questionState))
         {
             SetAllUIsInactive();
-            if (questionState.successful)
+            if (questionState.successes.All(s => s))
             {
-                CorrectLabel.SetActive(true);
+                ShowCorrect(false);
             }
             else
             {
-                var scenario = email.scenarios[questionState.order[questionState.currentTry]];
+                var scenario = email.scenarios[questionState.currentTry];
                 OptionsUI.SetActive(true);
                 var questionText = OptionsUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
                 if (questionText != null)
@@ -163,24 +172,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
                             RectTransform.Axis.Vertical,
                             30);
                     }
-
-                    // Make the heights of the options fit
-                    /*foreach (var child in dropdown.transform)
-                    {
-                        print(child);
-                        if (child is GameObject childObj)
-                        {
-                            print("in1");
-                            if (childObj.name == "Item")
-                            {
-                                print("in2");
-                                var text = childObj.transform.GetChild(0)?.GetComponent<RectTransform>();
-                                childObj.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
-                                    RectTransform.Axis.Vertical,
-                                    text.sizeDelta.y + 10);
-                            }
-                        }
-                    }*/
                 }
             }
         }
@@ -206,9 +197,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
             && questionStates.TryGetValue(activeEmail.name, out var questionState))
         {
             StartQuestionUI(activeEmail);
-            var canvas = email.Item1.transform.GetChild(0).GetComponent<Canvas>();
-            var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
-            body.text = activeEmail.scenarios[questionState.order[questionState.currentTry]].background;
+            UpdateBackgroundText(email.Item1, questionState);
         }
     }
 
@@ -216,26 +205,42 @@ public class ARPlaceTrackedImages : MonoBehaviour
     {
         if (activeEmail != null && questionStates.TryGetValue(activeEmail.name, out var questionState))
         {
-            var currentScenario = activeEmail.scenarios[questionState.order[questionState.currentTry]];
+            var currentScenario = activeEmail.scenarios[questionState.currentTry];
             var dropdown = OptionsUI.transform.GetChild(2)?.GetComponent<TMP_Dropdown>();
             if (dropdown != null && dropdown.options[dropdown.value].text == currentScenario.correct)
             {
                 SetAllUIsInactive();
-                CorrectLabel.SetActive(true);
-                questionState.successful = true;
-                var scoreText = ScoreUI.transform.GetChild(1)?.GetComponent<TMPro.TextMeshProUGUI>();
-                if (scoreText != null)
+                questionState.successes[questionState.currentTry] = true;
+                if (questionState.successes.All(s => s))
                 {
-                    scoreText.text = questionStates.Count(s => s.Value.successful).ToString()
-                        + "/"
-                        + questionStates.Count.ToString();
+                    ShowCorrect(false);
+                    var scoreText = ScoreUI.transform.GetChild(1)?.GetComponent<TMPro.TextMeshProUGUI>();
+                    if (scoreText != null)
+                    {
+                        scoreText.text = questionStates.Count(s => s.Value.successes.All(s => s)).ToString()
+                            + "/"
+                            + questionStates.Count.ToString();
+                    }
+                }
+                else
+                {
+                    ShowCorrect(true);
+                    do
+                    {
+                        questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
+                    }
+                    while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
                 }
             }
             else
             {
                 SetAllUIsInactive();
                 IncorrectLabel.SetActive(true);
-                questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
+                do
+                {
+                    questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
+                }
+                while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
             }
         }
     }
@@ -248,15 +253,34 @@ public class ARPlaceTrackedImages : MonoBehaviour
         {
             canvas.worldCamera = Camera;
 
-            var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
+            /*var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
 
             if (body != null && questionStates.TryGetValue(email.name, out var questionState))
             {
-                body.text = email.scenarios[questionState.order[questionState.currentTry]].background;
-            }
+                body.text = email.scenarios[questionState.currentTry].background;
+            }*/
         }
 
         return newPrefab;
+    }
+
+    private void UpdateBackgroundText(GameObject email, QuestionState questionState)
+    {
+        var canvas = email?.transform?.GetChild(0)?.GetComponent<Canvas>();
+        if (canvas != null && activeEmail != null)
+        {
+            var body = canvas?.transform?.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
+            if (body != null)
+            {
+                body.text = activeEmail.scenarios[questionState.currentTry].background;
+            }
+        }
+    }
+
+    public void ShowCorrect(bool showNextButton)
+    {
+        CorrectLabel.SetActive(true);
+        CorrectLabel.transform.GetChild(1)?.gameObject.SetActive(showNextButton);
     }
 
     [Serializable]
@@ -284,8 +308,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
     private class QuestionState
     {
         public string questionName;
-        public int[] order;
+        public bool[] successes;
         public int currentTry = 0;
-        public bool successful = false;
     }
 }
