@@ -24,7 +24,7 @@
 			]
 		},
 		{
-			"name": "Map",
+			"name": "Certificate",
 			"scenarios": [
 				{
 					"question": "Choose the best greeting",
@@ -47,7 +47,7 @@
 			]
 		},
 		{
-			"name": "Fukushima",
+			"name": "NewZealand",
 			"scenarios": [
 				{
 					"question": "Choose the best self-introduction",
@@ -64,7 +64,7 @@
 			]
 		},
 		{
-			"name": "Conbini",
+			"name": "Pronounciation",
 			"scenarios": [
 				{
 					"question": "Choose the best way to ask for more time to complete the homework",
@@ -81,7 +81,7 @@
 			]
 		},
 		{
-			"name": "Awards",
+			"name": "Toeic",
 			"scenarios": [
 				{
 					"question": "Choose the best way to finish the email",
