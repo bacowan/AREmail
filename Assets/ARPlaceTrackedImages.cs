@@ -232,10 +232,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
                         questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
                     }
                     while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
-
-                    print(activeEmail.name);
-                    print(questionState.questionName);
-                    print(questionState.currentTry);
                 }
             }
             else
@@ -247,10 +243,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
                     questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
                 }
                 while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
-
-                print(activeEmail.name);
-                print(questionState.questionName);
-                print(questionState.currentTry);
             }
         }
     }
@@ -272,8 +264,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
         GameObject email,
         QuestionState questionState)
     {
-        try
-        {
         var canvas = email?.transform?.GetChild(0)?.GetComponent<Canvas>();
         if (canvas != null && active != null)
         {
@@ -282,15 +272,6 @@ public class ARPlaceTrackedImages : MonoBehaviour
             {
                 body.text = active.scenarios[questionState.currentTry].background;
             }
-            }
-
-        }
-        catch (Exception e)
-        {
-            print(questionState.currentTry.ToString());
-            print(questionState.questionName);
-            print(activeEmail.name);
-            throw e;
         }
     }
 
