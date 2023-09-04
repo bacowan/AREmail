@@ -82,6 +82,8 @@ public class ARPlaceTrackedImages : MonoBehaviour
             }
         }
 
+        var active = instantiatedEmails.Values.FirstOrDefault(v => v.Item1.activeSelf)?.Item2;
+
         // Go through images with state changes
         foreach (var trackedImage in eventArgs.updated)
         {
@@ -90,7 +92,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
 
             if (questionStates.TryGetValue(trackedImage.referenceImage.name, out var questionState))
             {
-                UpdateBackgroundText(trackedItem.Item1, questionState);
+                UpdateBackgroundText(active, trackedItem.Item1, questionState);
             }
         }
 
@@ -102,7 +104,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
         }
 
         // update the active email for the UI to display correctly
-        SetActiveEmail(instantiatedEmails.Values.FirstOrDefault(v => v.Item1.activeSelf)?.Item2);
+        SetActiveEmail(active);
     }
 
     // We have one "active email" at a time. This is the one that appears on-screen for the UI.
@@ -148,7 +150,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
 
                     var itemTemplate = dropdown.transform.Find("Template/Viewport/Content/Item");
                     var contentTemplate = dropdown.transform.Find("Template/Viewport/Content");
-                    if (scenario.options.Any(o => o.Length > 35))
+                    if (scenario.options.Any(o => o.Length > 90))
                     {
                         dropdown.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(
                             RectTransform.Axis.Vertical,
@@ -197,7 +199,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
             && questionStates.TryGetValue(activeEmail.name, out var questionState))
         {
             StartQuestionUI(activeEmail);
-            UpdateBackgroundText(email.Item1, questionState);
+            UpdateBackgroundText(activeEmail, email.Item1, questionState);
         }
     }
 
@@ -230,6 +232,10 @@ public class ARPlaceTrackedImages : MonoBehaviour
                         questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
                     }
                     while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
+
+                    print(activeEmail.name);
+                    print(questionState.questionName);
+                    print(questionState.currentTry);
                 }
             }
             else
@@ -241,6 +247,10 @@ public class ARPlaceTrackedImages : MonoBehaviour
                     questionState.currentTry = (questionState.currentTry + 1) % activeEmail.scenarios.Length;
                 }
                 while (questionState.successes[questionState.currentTry] && !questionState.successes.All(s => s));
+
+                print(activeEmail.name);
+                print(questionState.questionName);
+                print(questionState.currentTry);
             }
         }
     }
@@ -252,28 +262,35 @@ public class ARPlaceTrackedImages : MonoBehaviour
         if (canvas != null)
         {
             canvas.worldCamera = Camera;
-
-            /*var body = canvas.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
-
-            if (body != null && questionStates.TryGetValue(email.name, out var questionState))
-            {
-                body.text = email.scenarios[questionState.currentTry].background;
-            }*/
         }
 
         return newPrefab;
     }
 
-    private void UpdateBackgroundText(GameObject email, QuestionState questionState)
+    private void UpdateBackgroundText(
+        QuestionCollection.QuestionInfo active,
+        GameObject email,
+        QuestionState questionState)
     {
+        try
+        {
         var canvas = email?.transform?.GetChild(0)?.GetComponent<Canvas>();
-        if (canvas != null && activeEmail != null)
+        if (canvas != null && active != null)
         {
             var body = canvas?.transform?.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
             if (body != null)
             {
-                body.text = activeEmail.scenarios[questionState.currentTry].background;
+                body.text = active.scenarios[questionState.currentTry].background;
             }
+            }
+
+        }
+        catch (Exception e)
+        {
+            print(questionState.currentTry.ToString());
+            print(questionState.questionName);
+            print(activeEmail.name);
+            throw e;
         }
     }
 
