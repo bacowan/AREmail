@@ -15,6 +15,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
     public GameObject OptionsUI;
     public GameObject ScoreUI;
     public GameObject CorrectLabel;
+    public GameObject NextPosterLabel;
     public GameObject IncorrectLabel;
     public TextAsset EmailData;
     public Camera Camera;
@@ -88,9 +89,10 @@ public class ARPlaceTrackedImages : MonoBehaviour
         foreach (var trackedImage in eventArgs.updated)
         {
             var trackedItem = instantiatedEmails[trackedImage.referenceImage.name];
-            trackedItem.Item1.SetActive(trackedImage.trackingState == TrackingState.Tracking);
+            var isTracking = trackedImage.trackingState == TrackingState.Tracking;
+            trackedItem.Item1.SetActive(isTracking);
 
-            if (questionStates.TryGetValue(trackedImage.referenceImage.name, out var questionState))
+            if ( isTracking && questionStates.TryGetValue(trackedImage.referenceImage.name, out var questionState))
             {
                 UpdateBackgroundText(active, trackedItem.Item1, questionState);
             }
@@ -134,6 +136,7 @@ public class ARPlaceTrackedImages : MonoBehaviour
             }
             else
             {
+                NextPosterLabel.SetActive(false);
                 var scenario = email.scenarios[questionState.currentTry];
                 OptionsUI.SetActive(true);
                 var questionText = OptionsUI.transform.GetChild(0)?.GetComponent<TMPro.TextMeshProUGUI>();
@@ -279,6 +282,19 @@ public class ARPlaceTrackedImages : MonoBehaviour
     {
         CorrectLabel.SetActive(true);
         CorrectLabel.transform.GetChild(1)?.gameObject.SetActive(showNextButton);
+        if (!showNextButton)
+        {
+            NextPosterLabel.SetActive(true);
+            var finishedText = NextPosterLabel?.GetComponent<TMPro.TextMeshProUGUI>();
+            if (questionStates.All(s => s.Value.successes.All(s => s)))
+            {
+                finishedText.text = "That's everything!";
+            }
+            else
+            {
+                finishedText.text = "Find the next poster!";
+            }
+        }
     }
 
     [Serializable]
