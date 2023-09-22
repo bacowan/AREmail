@@ -51,7 +51,7 @@
 			"scenarios": [
 				{
 					"question": "Choose the best self-introduction",
-					"background": "You are writing an email to your teacher to ask for more time to complete an assignment. Your teacher’s name is John Blake (Blake is his surname)",
+					"background": "You are writing an email to your teacher to ask for more time to complete an assignment. Your teacher’s name is Ian Wilson (Wilson is his surname)",
 					"options": ["Dear Prof. Wilson, My name is Cameron Green, student number 123123123. I am in your Bridge to Intermediate English class.", "Dear Prof. Wilson, I’m your student.", "Dear Prof. Wilson, I’m in your Bridge to Intermediate class. Your class is excellent."],
 					"correct": "Dear Prof. Wilson, My name is Cameron Green, student number 123123123. I am in your Bridge to Intermediate English class."
 				},
